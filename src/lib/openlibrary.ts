@@ -1,5 +1,3 @@
-// src/lib/openlibrary.ts
-
 import { 
   Book, 
   OpenLibSearchResponse, 
@@ -15,21 +13,21 @@ const COVER_URL = "https://covers.openlibrary.org/b/id";
 
 // Mapping untuk hasil SEARCH
 const mapSearchToBook = (doc: OpenLibDoc): Book => ({
-  id: doc.key, // Gunakan key sementara sebagai ID
-  openLibraryId: doc.key,
+  id: doc.key.replace("/works/", ""), // <--- PERBAIKAN: Hapus prefix /works/
+  openLibraryId: doc.key.replace("/works/", ""), // <--- PERBAIKAN: Hapus prefix /works/
   title: doc.title,
   author: doc.author_name?.[0] || "Unknown Author",
   coverUrl: doc.cover_i 
     ? `${COVER_URL}/${doc.cover_i}-L.jpg` 
-    : "/images/book-placeholder.png", // Pastikan nanti Anda punya gambar ini atau ganti URL placeholder online
+    : "/images/book-placeholder.png",
   publishYear: doc.first_publish_year || 0,
   isFeatured: false,
 });
 
 // Mapping untuk hasil TRENDING (Subject)
 const mapWorkToBook = (work: OpenLibWork): Book => ({
-  id: work.key,
-  openLibraryId: work.key,
+  id: work.key.replace("/works/", ""), // <--- PERBAIKAN: Hapus prefix /works/
+  openLibraryId: work.key.replace("/works/", ""), // <--- PERBAIKAN: Hapus prefix /works/
   title: work.title,
   author: work.authors?.[0]?.name || "Unknown Author",
   coverUrl: work.cover_id 
@@ -42,8 +40,7 @@ const mapWorkToBook = (work: OpenLibWork): Book => ({
 // --- Main Functions ---
 
 /**
- * 1. Mencari buku berdasarkan query (Judul/Penulis)
- * Digunakan di halaman Search (SSR)
+ * 1. Mencari buku berdasarkan query
  */
 export async function searchBooks(query: string, limit = 12): Promise<Book[]> {
   if (!query) return [];
@@ -56,7 +53,6 @@ export async function searchBooks(query: string, limit = 12): Promise<Book[]> {
     
     const data: OpenLibSearchResponse = await res.json();
     
-    // Filter hanya buku yang punya cover (opsional, biar UI bagus)
     return data.docs
       .filter((doc) => doc.cover_i) 
       .map(mapSearchToBook);
@@ -68,13 +64,11 @@ export async function searchBooks(query: string, limit = 12): Promise<Book[]> {
 }
 
 /**
- * 2. Mengambil buku trending berdasarkan topik
- * Digunakan di Homepage (SSG)
+ * 2. Mengambil buku trending
  */
 export async function getTrendingBooks(subject = "programming"): Promise<Book[]> {
   try {
     const url = `${BASE_URL}/subjects/${subject}.json?limit=6`;
-    // Revalidate tiap 1 jam (ISR)
     const res = await fetch(url, { next: { revalidate: 3600 } });
     
     if (!res.ok) return [];
@@ -89,34 +83,44 @@ export async function getTrendingBooks(subject = "programming"): Promise<Book[]>
 }
 
 /**
- * 3. Mengambil detail satu buku
- * Digunakan di halaman Detail Buku
+ * 3. Mengambil detail satu buku (UPDATED)
  */
 export async function getBookDetail(key: string): Promise<Book | null> {
   try {
-    // Key biasanya format "/works/OL123W", API butuh "OL123W"
+    // Pastikan key bersih dari "/works/" (Double check)
     const cleanKey = key.replace("/works/", "");
     const url = `${BASE_URL}/works/${cleanKey}.json`;
     
-    const res = await fetch(url, { next: { revalidate: 86400 } }); // Cache 24 jam
+    const res = await fetch(url, { next: { revalidate: 86400 } });
     if (!res.ok) return null;
 
     const data = await res.json();
 
-    // Perlu fetch author terpisah karena detail API return author key, bukan nama
-    // Untuk simplifikasi phase ini, kita return data dasar dulu
+    // Fetch Author Name
+    let authorName = "Unknown Author";
+    if (data.authors && data.authors.length > 0) {
+      try {
+        const authorKey = data.authors[0].author.key.replace("/authors/", "");
+        const authorRes = await fetch(`${BASE_URL}/authors/${authorKey}.json`);
+        const authorData = await authorRes.json();
+        authorName = authorData.name || "Unknown Author";
+      } catch (err) {
+        console.error("Failed to fetch author detail", err);
+      }
+    }
+
     return {
-      id: key,
-      openLibraryId: key,
+      id: cleanKey,
+      openLibraryId: cleanKey,
       title: data.title,
-      author: "Loading...", // Nanti kita perbaiki di Phase UI Detail
+      author: authorName,
       coverUrl: data.covers?.[0] 
         ? `${COVER_URL}/${data.covers[0]}-L.jpg` 
         : "/images/book-placeholder.png",
-      publishYear: 0,
+      publishYear: parseInt(data.created?.value?.substring(0, 4)) || 0,
       description: typeof data.description === 'string' 
         ? data.description 
-        : data.description?.value || "No description available.",
+        : data.description?.value || "Tidak ada deskripsi untuk buku ini.",
     };
 
   } catch (error) {
