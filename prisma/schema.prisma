@@ -1,47 +1,61 @@
+// File: prisma/schema.prisma
+
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "postgresql"
+  provider  = "postgresql"
   url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")     
+  directUrl = env("DIRECT_URL")
 }
 
+// 1. Enum Role
 enum Role {
   USER
   ADMIN
 }
 
+// 2. Model User
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
-  role      Role     @default(USER)
-  createdAt DateTime @default(now())
+  id        String     @id
+  email     String     @unique
+  role      Role       @default(USER) // Kolom Role
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  
   bookmarks Bookmark[]
 }
 
+// 3. Model Book
 model Book {
-  id            String   @id @default(cuid())
-  openLibraryId String   @unique
+  id            String     @id @default(cuid())
+  openLibraryId String     @unique
   title         String
-  author        String?
-  coverUrl      String?
-  isFeatured    Boolean  @default(false)
-  isHidden      Boolean  @default(false)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  author        String
+  coverUrl      String
+  publishYear   Int
+  description   String?    @db.Text
+  
+  // Kolom Admin Features
+  isFeatured    Boolean    @default(false)
+  isHidden      Boolean    @default(false)
+  
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
   bookmarks     Bookmark[]
 }
 
+// 4. Model Bookmark
 model Bookmark {
   id        String   @id @default(cuid())
   userId    String
   bookId    String
   createdAt DateTime @default(now())
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  book      Book     @relation(fields: [bookId], references: [id], onDelete: Cascade)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  book Book @relation(fields: [bookId], references: [id], onDelete: Cascade)
 
   @@unique([userId, bookId])
 }
