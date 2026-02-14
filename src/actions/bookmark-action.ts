@@ -1,47 +1,37 @@
 "use server";
 
-import { auth } from "@clerk/nextjs/server";
+import { auth, currentUser } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 import { Book } from "@/types";
 import { revalidatePath } from "next/cache";
 
-// Fungsi untuk Toggle (Simpan/Hapus) Bookmark
 export async function toggleBookmark(book: Book) {
-  // 1. Cek User Login
-  const { userId } = await auth();
-  if (!userId) {
-    return { success: false, message: "Anda harus login untuk menyimpan buku." };
-  }
-
   try {
-    // 2. Cek apakah user sudah ada di database lokal?
-    // (Clerk menangani auth, tapi kita butuh record user di tabel Prisma kita untuk relasi)
-    let user = await prisma.user.findUnique({
-      where: { id: userId },
-    });
+    const { userId } = await auth();
+    const user = await currentUser();
 
-    // Jika user belum ada di DB lokal, buat dulu (Sync otomatis)
-    if (!user) {
-      // Kita butuh email user, tapi auth() clerk cuma kasih ID.
-      // Untuk simplifikasi, kita buat user tanpa email dulu atau abaikan relasi strict
-      // Tapi solusi terbaik adalah menggunakan Webhook Clerk (Nanti di Phase optimasi).
-      // SEMENTARA: Kita "Upsert" user sederhana
-      await prisma.user.create({
-        data: {
-          id: userId,
-          email: `user_${userId}@clerk.placeholder`, // Placeholder aman
-          role: "USER",
-        }
-      });
+    if (!userId || !user) {
+      return { success: false, message: "Anda harus login terlebih dahulu" };
     }
 
-    // 3. Cek apakah BUKU ini sudah ada di database lokal kita?
-    // Kita pakai openLibraryId sebagai acuan unik
+    // 1. Pastikan User terdaftar di database lokal kita
+    // Kita gunakan upsert: jika ada update emailnya, jika belum ada buat baru
+    await prisma.user.upsert({
+      where: { id: userId },
+      update: { email: user.emailAddresses[0].emailAddress },
+      create: {
+        id: userId,
+        email: user.emailAddresses[0].emailAddress,
+        role: "USER",
+      },
+    });
+
+    // 2. Cek apakah buku sudah ada di database lokal
     let localBook = await prisma.book.findUnique({
       where: { openLibraryId: book.openLibraryId },
     });
 
-    // Jika buku belum ada, kita simpan dulu data detailnya (Cache lokal)
+    // 3. Jika buku BELUM ADA, simpan dulu detailnya (Cache lokal)
     if (!localBook) {
       localBook = await prisma.book.create({
         data: {
@@ -49,30 +39,34 @@ export async function toggleBookmark(book: Book) {
           title: book.title,
           author: book.author,
           coverUrl: book.coverUrl,
-          // Properti lain default false
+          // --- PERBAIKAN DI SINI ---
+          // Kita tambahkan publishYear (gunakan 0 jika tidak ada datanya)
+          publishYear: book.publishYear || 0, 
+          description: book.description || "",
+          // ------------------------
         },
       });
     }
 
-    // 4. Cek Status Bookmark saat ini
+    // 4. Cek apakah user sudah mem-bookmark buku ini
     const existingBookmark = await prisma.bookmark.findUnique({
       where: {
         userId_bookId: {
           userId: userId,
-          bookId: localBook.id, // Pakai ID internal database (CUID), bukan OpenLibID
+          bookId: localBook.id,
         },
       },
     });
 
     if (existingBookmark) {
-      // A. Jika SUDAH ada -> HAPUS (Un-bookmark)
+      // Jika sudah ada, maka hapus (Un-bookmark)
       await prisma.bookmark.delete({
         where: { id: existingBookmark.id },
       });
-      revalidatePath("/my-books"); // Refresh halaman koleksi
-      return { success: true, message: "Buku dihapus dari koleksi.", isBookmarked: false };
+      revalidatePath("/my-books");
+      return { success: true, isBookmarked: false, message: "Berhasil dihapus dari koleksi" };
     } else {
-      // B. Jika BELUM ada -> BUAT BARU (Bookmark)
+      // Jika belum ada, maka tambah (Bookmark)
       await prisma.bookmark.create({
         data: {
           userId: userId,
@@ -80,29 +74,27 @@ export async function toggleBookmark(book: Book) {
         },
       });
       revalidatePath("/my-books");
-      return { success: true, message: "Buku disimpan ke koleksi!", isBookmarked: true };
+      return { success: true, isBookmarked: true, message: "Berhasil disimpan ke koleksi" };
     }
-
   } catch (error) {
     console.error("Bookmark Error:", error);
-    return { success: false, message: "Terjadi kesalahan sistem." };
+    return { success: false, message: "Terjadi kesalahan pada sistem" };
   }
 }
 
-// Fungsi Cek Status (Untuk UI awal)
+// Fungsi pembantu untuk cek status awal (dipakai di halaman Detail Buku)
 export async function checkBookmarkStatus(openLibraryId: string) {
   const { userId } = await auth();
   if (!userId) return false;
 
-  const book = await prisma.book.findUnique({
-    where: { openLibraryId },
-    include: {
-      bookmarks: {
-        where: { userId },
+  const bookmark = await prisma.bookmark.findFirst({
+    where: {
+      userId: userId,
+      book: {
+        openLibraryId: openLibraryId,
       },
     },
   });
 
-  // Return true jika book ada DAN punya bookmark dari user ini
-  return !!book?.bookmarks.length;
+  return !!bookmark;
 }
