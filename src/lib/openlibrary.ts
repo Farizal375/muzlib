@@ -47,9 +47,19 @@ export async function searchBooks(query: string, limit = 12): Promise<Book[]> {
   
   try {
     const url = `${BASE_URL}/search.json?q=${encodeURIComponent(query)}&limit=${limit}`;
-    const res = await fetch(url);
     
-    if (!res.ok) throw new Error("Failed to fetch books");
+    // TAMBAHAN: Tambahkan options headers agar tidak dianggap bot jahat
+    const res = await fetch(url, {
+      headers: {
+        "User-Agent": "MuzLib-Project/1.0 (Student Education Project)"
+      }
+    });
+    
+    // PERBAIKAN: Jangan throw Error, tapi return array kosong & log errornya
+    if (!res.ok) {
+      console.error(`Gagal mengambil data buku: ${res.status} ${res.statusText}`);
+      return [];
+    }
     
     const data: OpenLibSearchResponse = await res.json();
     
@@ -59,7 +69,7 @@ export async function searchBooks(query: string, limit = 12): Promise<Book[]> {
       
   } catch (error) {
     console.error("Error searching books:", error);
-    return [];
+    return []; // Return kosong agar halaman tidak "Crash" (layar putih)
   }
 }
 

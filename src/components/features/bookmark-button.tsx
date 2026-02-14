@@ -2,8 +2,8 @@
 
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
-import { Bookmark } from "lucide-react";
-import { toast } from "sonner"; // Pakai library toast bawaan Shadcn
+import { Bookmark, Loader2 } from "lucide-react"; // 1. Import Loader2 (Ikon Spinner)
+import { toast } from "sonner";
 import { toggleBookmark } from "@/actions/bookmark-action";
 import { Book } from "@/types";
 import { useAuth } from "@clerk/nextjs";
@@ -11,10 +11,11 @@ import { useRouter } from "next/navigation";
 
 interface BookmarkButtonProps {
   book: Book;
-  initialState?: boolean; // Status awal (sudah dilike atau belum)
+  initialState?: boolean;
   size?: "sm" | "default" | "lg";
   variant?: "default" | "ghost" | "outline" | "secondary";
   showText?: boolean;
+  className?: string;
 }
 
 export function BookmarkButton({ 
@@ -22,15 +23,17 @@ export function BookmarkButton({
   initialState = false, 
   size = "default",
   variant = "default",
-  showText = true
+  showText = true,
+  className = "" 
 }: BookmarkButtonProps) {
+  
   const [isBookmarked, setIsBookmarked] = useState(initialState);
-  const [isPending, startTransition] = useTransition();
+  const [isPending, startTransition] = useTransition(); // Ini mendeteksi status loading server
   const { isSignedIn } = useAuth();
   const router = useRouter();
 
   const handleClick = async (e: React.MouseEvent) => {
-    e.preventDefault(); // Mencegah link card terklik (jika tombol ada di dalam card)
+    e.preventDefault();
     e.stopPropagation();
 
     if (!isSignedIn) {
@@ -39,21 +42,21 @@ export function BookmarkButton({
       return;
     }
 
-    // Optimistic UI: Langsung ubah warna icon sebelum server merespon
+    // Optimistic Update: Kita simpan state sebelumnya jaga-jaga kalau gagal
     const previousState = isBookmarked;
-    setIsBookmarked(!isBookmarked);
 
+    // Mulai transisi server action
     startTransition(async () => {
+      // Panggil Server Action
       const result = await toggleBookmark(book);
       
       if (result.success) {
         toast.success(result.message);
-        // Pastikan state sinkron dengan server
         if (result.isBookmarked !== undefined) {
           setIsBookmarked(result.isBookmarked);
         }
       } else {
-        // Revert jika gagal
+        // Balikkan state jika gagal
         setIsBookmarked(previousState);
         toast.error(result.message);
       }
@@ -65,13 +68,24 @@ export function BookmarkButton({
       variant={variant} 
       size={size} 
       onClick={handleClick}
-      disabled={isPending}
-      className={isBookmarked ? "text-blue-600" : ""}
+      disabled={isPending} // Disable tombol saat loading
+      className={`${isBookmarked && !isPending ? "text-blue-600" : ""} ${className}`} 
     >
-      <Bookmark 
-        className={`w-4 h-4 ${showText ? "mr-2" : ""} ${isBookmarked ? "fill-current" : ""}`} 
-      />
-      {showText && (isBookmarked ? "Disimpan" : "Simpan")}
+      {/* LOGIKA IKON: Jika loading tampilkan Loader2, jika tidak tampilkan Bookmark */}
+      {isPending ? (
+        <Loader2 className={`w-4 h-4 animate-spin ${showText ? "mr-2" : ""}`} />
+      ) : (
+        <Bookmark 
+          className={`w-4 h-4 ${showText ? "mr-2" : ""} ${isBookmarked ? "fill-current" : ""}`} 
+        />
+      )}
+
+      {/* LOGIKA TEKS */}
+      {showText && (
+        isPending 
+          ? "Menyimpan..." 
+          : (isBookmarked ? "Disimpan" : "Simpan")
+      )}
     </Button>
   );
 }

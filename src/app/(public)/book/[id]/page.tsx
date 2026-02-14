@@ -5,6 +5,8 @@ import { getBookDetail } from "@/lib/openlibrary";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, BookOpen, Calendar, Share2, Bookmark } from "lucide-react";
+import { BookmarkButton } from "@/components/features/bookmark-button";
+import { checkBookmarkStatus } from "@/actions/bookmark-action";
 
 // UPDATE 1: Interface Params harus berupa Promise
 interface PageProps {
@@ -28,6 +30,8 @@ export default async function BookDetailPage({ params }: PageProps) {
     notFound();
   }
 
+  const isBookmarked = await checkBookmarkStatus(book.openLibraryId);
+
   return (
     <div className="min-h-screen bg-slate-50 py-12">
       <div className="container mx-auto px-4 max-w-5xl">
@@ -47,6 +51,7 @@ export default async function BookDetailPage({ params }: PageProps) {
                 src={book.coverUrl}
                 alt={book.title}
                 fill
+                unoptimized={true}
                 className="object-contain p-8"
                 priority
               />
@@ -94,12 +99,16 @@ export default async function BookDetailPage({ params }: PageProps) {
                 </p>
               </div>
 
-              {/* Action Buttons */}
+             {/* Action Buttons */}
               <div className="flex flex-col sm:flex-row gap-4 mt-auto">
-                <Button size="lg" className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700">
-                  <Bookmark className="w-5 h-5 mr-2" />
-                  Simpan ke Koleksi
-                </Button>
+                <div className="w-full sm:w-auto">
+                  <BookmarkButton 
+                    book={book} 
+                    initialState={isBookmarked} // Pastikan variabel ini sudah didefinisikan di atas (seperti panduan sebelumnya)
+                    size="lg" 
+                    variant="default"
+                  />
+                </div>
                 
                 <Button size="lg" variant="outline" className="w-full sm:w-auto">
                   <Share2 className="w-5 h-5 mr-2" />
