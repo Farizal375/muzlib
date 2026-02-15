@@ -14,8 +14,7 @@ export async function toggleBookmark(book: Book) {
       return { success: false, message: "Anda harus login terlebih dahulu" };
     }
 
-    // 1. Pastikan User terdaftar di database lokal kita
-    // Kita gunakan upsert: jika ada update emailnya, jika belum ada buat baru
+    // 1. Pastikan User terdaftar di database lokal kita (upsert)
     await prisma.user.upsert({
       where: { id: userId },
       update: { email: user.emailAddresses[0].emailAddress },
@@ -39,11 +38,9 @@ export async function toggleBookmark(book: Book) {
           title: book.title,
           author: book.author,
           coverUrl: book.coverUrl,
-          // --- PERBAIKAN DI SINI ---
-          // Kita tambahkan publishYear (gunakan 0 jika tidak ada datanya)
-          publishYear: book.publishYear || 0, 
+          publishYear: book.publishYear || 0,  // tambahkan publishYear (gunakan 0 jika tidak ada datanya)
           description: book.description || "",
-          // ------------------------
+          
         },
       });
     }

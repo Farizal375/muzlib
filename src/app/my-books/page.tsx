@@ -20,16 +20,15 @@ export default async function MyBooksPage() {
   }
 
   // 2. Ambil data dari Database Lokal (Prisma)
-  // Kita cari semua Bookmark milik User ini, dan INCLUDE (join) data bukunya
   const bookmarks = await prisma.bookmark.findMany({
     where: {
       userId: userId,
     },
     include: {
-      book: true, // Ambil detail buku sekalian
+      book: true, 
     },
     orderBy: {
-      createdAt: "desc", // Urutkan dari yang paling baru disimpan
+      createdAt: "desc", 
     },
   });
 
@@ -40,7 +39,7 @@ export default async function MyBooksPage() {
     title: item.book.title,
     author: item.book.author || "Penulis Tidak Diketahui",
     coverUrl: item.book.coverUrl || "/images/book-placeholder.png",
-    publishYear: 0,                 // Kita set 0 karena di DB simple kita tidak simpan tahun
+    publishYear: 0,                 // Kita set 0 karena di DB lokal tidak ada tahun terbit
     isFeatured: item.book.isFeatured,
   }));
 

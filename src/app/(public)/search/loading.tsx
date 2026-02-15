@@ -5,7 +5,7 @@ export default function Loading() {
     <div className="container mx-auto px-4 py-8 min-h-screen">
       <div className="flex flex-col items-center mb-8 gap-4">
         <Skeleton className="h-10 w-48" /> {/* Title Skeleton */}
-        <Skeleton className="h-10 w-full max-w-sm" /> {/* SearchBar Skeleton */}
+        <Skeleton className="h-10 w-full max-w-sm" /> {/* Search Bar Skeleton */}
       </div>
 
       <div className="mt-8 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6">

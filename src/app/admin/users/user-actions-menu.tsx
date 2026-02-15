@@ -60,7 +60,7 @@ export function UserActionsMenu({ userId, currentRole }: UserActionsMenuProps) {
       if (result.success) {
         toast.success("Role Berhasil Diubah", {
           description: result.message, // Pesan detail: "User jadi Admin"
-          duration: 4000, // Hilang sendiri dalam 4 detik
+          duration: 4000, 
         });
       } else {
         toast.error("Gagal", { description: result.message });
