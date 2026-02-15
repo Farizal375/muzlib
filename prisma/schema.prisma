@@ -59,3 +59,12 @@ model Bookmark {
 
   @@unique([userId, bookId])
 }
+
+// Tabel untuk menyimpan konfigurasi dinamis aplikasi
+model SystemConfig {
+  id    String @id @default(cuid())
+  key   String @unique // Contoh: "trending_limit"
+  value String // Contoh: "40" (Disimpan sebagai string agar fleksibel)
+  
+  updatedAt DateTime @updatedAt
+}

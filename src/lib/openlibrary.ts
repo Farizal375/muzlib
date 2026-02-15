@@ -5,6 +5,8 @@ import {
   OpenLibDoc, 
   OpenLibWork 
 } from "@/types";
+import { prisma } from "@/lib/prisma";
+
 
 const BASE_URL = "https://openlibrary.org";
 const COVER_URL = "https://covers.openlibrary.org/b/id";
@@ -13,8 +15,8 @@ const COVER_URL = "https://covers.openlibrary.org/b/id";
 
 // Mapping untuk hasil SEARCH
 const mapSearchToBook = (doc: OpenLibDoc): Book => ({
-  id: doc.key.replace("/works/", ""), // <--- PERBAIKAN: Hapus prefix /works/
-  openLibraryId: doc.key.replace("/works/", ""), // <--- PERBAIKAN: Hapus prefix /works/
+  id: doc.key.replace("/works/", ""), 
+  openLibraryId: doc.key.replace("/works/", ""), 
   title: doc.title,
   author: doc.author_name?.[0] || "Unknown Author",
   coverUrl: doc.cover_i 
@@ -26,8 +28,8 @@ const mapSearchToBook = (doc: OpenLibDoc): Book => ({
 
 // Mapping untuk hasil TRENDING (Subject)
 const mapWorkToBook = (work: OpenLibWork): Book => ({
-  id: work.key.replace("/works/", ""), // <--- PERBAIKAN: Hapus prefix /works/
-  openLibraryId: work.key.replace("/works/", ""), // <--- PERBAIKAN: Hapus prefix /works/
+  id: work.key.replace("/works/", ""), 
+  openLibraryId: work.key.replace("/works/", ""), 
   title: work.title,
   author: work.authors?.[0]?.name || "Unknown Author",
   coverUrl: work.cover_id 
@@ -76,22 +78,40 @@ export async function searchBooks(query: string, limit = 12): Promise<Book[]> {
 /**
  * 2. Mengambil buku trending
  */
-export async function getTrendingBooks(subject = "programming"): Promise<Book[]> {
+export async function getTrendingBooks(): Promise<Book[]> {
   try {
-    const url = `${BASE_URL}/subjects/${subject}.json?limit=6`;
-    const res = await fetch(url, { next: { revalidate: 3600 } });
+    // Ambil limit dari database
+    const config = await prisma.systemConfig.findUnique({
+      where: { key: "trending_limit" },
+    });
     
-    if (!res.ok) return [];
-    
-    const data: OpenLibSubjectResponse = await res.json();
-    return data.works.map(mapWorkToBook);
+    const limit = parseInt(config?.value || "10", 10);
+
+    const res = await fetch("https://openlibrary.org/trending/daily.json", {
+      next: { revalidate: 3600 }, 
+    });
+
+    if (!res.ok) throw new Error("Failed to fetch trending books");
+
+    const data = await res.json();
+
+    // Mapping data
+    return data.works.slice(0, limit).map((work: any) => ({
+      openLibraryId: work.key.replace("/works/", ""),
+      title: work.title,
+      author: work.author_name?.[0] || "Unknown Author",
+      coverUrl: work.cover_i
+        ? `https://covers.openlibrary.org/b/id/${work.cover_i}-L.jpg`
+        : null,
+      publishYear: work.first_publish_year || 0,
+      description: "", 
+    }));
     
   } catch (error) {
     console.error("Error fetching trending books:", error);
-    return [];
+    return []; // Karena sudah di-set Promise<Book[]>, array kosong ini aman
   }
 }
-
 /**
  * 3. Mengambil detail satu buku (UPDATED)
  */

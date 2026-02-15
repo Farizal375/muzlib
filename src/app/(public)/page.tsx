@@ -1,42 +1,72 @@
+import { auth } from "@clerk/nextjs/server";
+import { redirect } from "next/navigation";
+import { prisma } from "@/lib/prisma";
+import { getTrendingBooks } from "@/lib/openlibrary";
+import { BookCard } from "@/components/features/book-card"; 
 import Link from "next/link";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Star } from "lucide-react";
-import { getTrendingBooks } from "@/lib/openlibrary";
-import { prisma } from "@/lib/prisma"; // Import Prisma
-import { BookCard } from "@/components/features/book-card";
+import { ArrowRight, Star, BookOpen } from "lucide-react";
 
-// Revalidate data setiap 1 jam (ISR) agar tidak membebani database
-export const revalidate = 3600; 
+// Revalidate data setiap 1 jam (ISR)
+export const revalidate = 3600;
 
 export default async function Home() {
-  // 1. Ambil Buku Featured dari Database Lokal (Admin Choice)
-  const featuredBooks = await prisma.book.findMany({
-    where: { isFeatured: true },
-    take: 1, // Kita ambil 1 buku utama untuk Banner Besar
-    orderBy: { updatedAt: "desc" }, // Yang paling baru dijadikan featured
-  });
 
-  // Ambil sisa featured books untuk list kecil (opsional, tahap berikutnya)
+  // 1. LOGIKA TRAFFIC CONTROLLER (REDIRECT ADMIN)
+ 
+  const { userId } = await auth();
+  let isAdmin = false;
+
+  if (userId) {
+    try {
+      // Cek database hanya untuk mendapatkan role
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { role: true },
+      });
+
+      if (user?.role === "ADMIN") {
+        isAdmin = true;
+      }
+    } catch (error) {
+      console.error("Gagal mengambil data user:", error);
+      // Jika error, kita anggap bukan admin (fail-safe)
+    }
+  }
+
+  // PENTING: Redirect harus dilakukan DI LUAR try-catch
+  if (isAdmin) {
+    redirect("/admin/dashboard");
+  }
+
   
-  // 2. Ambil Buku Trending dari API (Sama seperti sebelumnya)
-  const trendingBooks = await getTrendingBooks();
+  // 2. DATA FETCHING (PARALLEL)
 
-  // Buku Utama untuk Hero Section
+  const [trendingBooks, featuredBooks] = await Promise.all([
+    getTrendingBooks(),
+    prisma.book.findMany({
+      where: { isFeatured: true },
+      take: 1,
+      orderBy: { updatedAt: "desc" },
+    }),
+  ]);
+
   const heroBook = featuredBooks[0];
 
   return (
     <div className="min-h-screen bg-slate-50">
-      {/* HERO SECTION (DINAMIS) */}
+      
+      {/* HERO SECTION */}
       <section className="bg-white border-b border-slate-200">
         <div className="container mx-auto px-4 py-16 md:py-24 flex flex-col md:flex-row items-center gap-12">
           
-          {/* Kolom Teks */}
+          {/* KOLOM KIRI: TEKS */}
           <div className="flex-1 space-y-6 text-center md:text-left">
             {heroBook ? (
-              // TAMPILAN JIKA ADA BUKU FEATURED DARI ADMIN
+              // --- TAMPILAN JIKA ADA BUKU FEATURED DARI ADMIN ---
               <>
-                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-yellow-100 text-yellow-800 text-sm font-medium">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-yellow-100 text-yellow-800 text-sm font-medium mx-auto md:mx-0">
                   <Star className="w-4 h-4 fill-current" />
                   Pilihan Editor Hari Ini
                 </div>
@@ -50,15 +80,14 @@ export default async function Home() {
                 </p>
                 <div className="flex flex-col sm:flex-row gap-4 justify-center md:justify-start pt-4">
                   <Link href={`/book/${heroBook.openLibraryId}`}>
-                    <Button size="lg" className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700">
-                      Baca Sekarang
-                      <ArrowRight className="ml-2 h-4 w-4" />
+                    <Button size="lg" className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 font-semibold px-8">
+                      Baca Sekarang <ArrowRight className="ml-2 w-4 h-4" />
                     </Button>
                   </Link>
                 </div>
               </>
             ) : (
-              // TAMPILAN DEFAULT (JIKA BELUM ADA YANG DI-FEATURED)
+              // --- TAMPILAN DEFAULT (JIKA BELUM ADA BUKU FEATURED) ---
               <>
                 <h1 className="text-4xl md:text-6xl font-extrabold text-slate-900 tracking-tight leading-tight">
                   Jelajahi Ribuan <br />
@@ -69,9 +98,8 @@ export default async function Home() {
                 </p>
                 <div className="flex flex-col sm:flex-row gap-4 justify-center md:justify-start pt-4">
                   <Link href="/search">
-                    <Button size="lg" className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700">
-                      Mulai Menjelajah
-                      <ArrowRight className="ml-2 h-4 w-4" />
+                    <Button size="lg" className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 font-semibold px-8">
+                      Mulai Menjelajah <ArrowRight className="ml-2 w-4 h-4" />
                     </Button>
                   </Link>
                 </div>
@@ -79,24 +107,26 @@ export default async function Home() {
             )}
           </div>
 
-          {/* Kolom Gambar */}
-          <div className="flex-1 relative w-full max-w-md mx-auto md:max-w-full">
-            <div className="relative aspect-[3/4] md:aspect-square max-h-[500px] mx-auto">
-              {/* Background Blob Decoration */}
-              <div className="absolute inset-0 bg-gradient-to-tr from-blue-100 to-slate-100 rounded-full blur-3xl opacity-60 -z-10" />
+          {/* KOLOM KANAN: GAMBAR */}
+          <div className="flex-1 relative w-full max-w-md mx-auto md:max-w-full flex justify-center">
+            <div className="relative w-64 md:w-80 aspect-[2/3] shadow-2xl rounded-lg overflow-hidden transform rotate-3 hover:rotate-0 transition-all duration-500">
               
+              {/* Background Glow */}
+              <div className="absolute inset-0 bg-blue-100 blur-3xl opacity-50 -z-10" />
+
               {heroBook ? (
-                 <Image
-                 src={heroBook.coverUrl || "/images/book-placeholder.png"}
-                 alt="Featured Book"
-                 fill
-                 className="object-contain drop-shadow-2xl hover:scale-105 transition-transform duration-500"
-                 priority
-                 unoptimized // PENTING: Agar tidak error 403 Forbidden
-               />
+                <Image
+                  src={heroBook.coverUrl || "/images/book-placeholder.png"}
+                  alt={heroBook.title}
+                  fill
+                  className="object-cover w-full h-full"
+                  priority
+                  unoptimized // Mencegah error 403 dari OpenLibrary
+                />
               ) : (
-                <div className="w-full h-full bg-slate-100 rounded-2xl flex items-center justify-center border-2 border-dashed border-slate-200">
-                   <p className="text-slate-400 font-medium">Ilustrasi Buku</p>
+                <div className="w-full h-full bg-slate-100 flex flex-col items-center justify-center text-slate-400 p-6 text-center border-2 border-dashed border-slate-300">
+                  <BookOpen className="w-12 h-12 mb-2 opacity-50" />
+                  <span className="text-sm">Belum ada buku featured</span>
                 </div>
               )}
             </div>
@@ -108,17 +138,30 @@ export default async function Home() {
       {/* TRENDING SECTION */}
       <section className="container mx-auto px-4 py-16">
         <div className="flex items-center justify-between mb-8">
-          <h2 className="text-2xl font-bold text-slate-900">Sedang Trending</h2>
-          <Link href="/search" className="text-blue-600 font-medium hover:underline">
-            Lihat Semua &rarr;
+          <div className="flex items-center gap-2">
+            <div className="p-2 bg-rose-100 rounded-lg">
+              <Star className="w-5 h-5 text-rose-600 fill-rose-600" />
+            </div>
+            <h2 className="text-2xl font-bold text-slate-900">Sedang Trending</h2>
+          </div>
+          <Link href="/search?sort=trending">
+            <Button variant="ghost" className="text-blue-600 hover:text-blue-700 hover:bg-blue-50">
+              Lihat Semua <ArrowRight className="ml-2 w-4 h-4" />
+            </Button>
           </Link>
         </div>
         
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6">
-          {trendingBooks.map((book) => (
-            <BookCard key={book.openLibraryId} book={book} />
-          ))}
-        </div>
+        {trendingBooks.length > 0 ? (
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6">
+            {trendingBooks.map((book) => (
+              <BookCard key={book.openLibraryId} book={book} />
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-20 bg-white rounded-xl border border-dashed border-slate-200">
+            <p className="text-slate-500">Belum ada data trending saat ini.</p>
+          </div>
+        )}
       </section>
     </div>
   );

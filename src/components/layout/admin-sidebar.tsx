@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { LayoutDashboard, BookOpen, Users, LogOut, X } from "lucide-react";
+import { LayoutDashboard, BookOpen, Users, LogOut, X, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
+
 
 interface AdminSidebarProps {
   className?: string;
@@ -32,6 +33,12 @@ export function AdminSidebar({ className, onNavigate }: AdminSidebarProps) {
           <Button variant="ghost" className="w-full justify-start text-slate-300 hover:text-white hover:bg-slate-800">
             <Users className="mr-2 h-4 w-4" />
             Daftar User
+          </Button>
+        </Link>
+        <Link href="/admin/settings" onClick={onNavigate}>
+          <Button variant="ghost" className="w-full justify-start text-slate-300 hover:text-white hover:bg-slate-800">
+            <Settings className="mr-2 h-4 w-4" />
+            Pengaturan
           </Button>
         </Link>
       </nav>
