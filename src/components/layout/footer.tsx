@@ -69,7 +69,7 @@ export function Footer() {
         </div>
         
         <div className="border-t border-slate-100 mt-12 pt-8 text-center text-sm text-slate-500">
-          &copy; {new Date().getFullYear()} MuzLib. All rights reserved. Built with Next.js & Supabase.
+          &copy; {new Date().getFullYear()} Farizal Muztahidin. All rights reserved. Built with Next.js.
         </div>
       </div>
     </footer>
