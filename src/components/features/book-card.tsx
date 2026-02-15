@@ -1,60 +1,96 @@
-import Image from "next/image";
+"use client";
+
 import Link from "next/link";
-import { Book } from "@/types";
-import { Card, CardContent, CardFooter } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { BookmarkButton } from "./bookmark-button"; // Import tombol pintar kita
+import Image from "next/image";
+import { Plus, Check, BookOpen } from "lucide-react";
+import { useReadingList } from "@/store/use-reading-list";
+import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 interface BookCardProps {
-  book: Book;
-  isBookmarked?: boolean; // Tambahan prop opsional
+  book: {
+    openLibraryId: string;
+    title: string;
+    author: string;
+    coverUrl: string | null;
+    publishYear: number;
+    description?: string;
+  };
 }
 
-export function BookCard({ book, isBookmarked = false }: BookCardProps) {
+export function BookCard({ book }: BookCardProps) {
+  const { addItem, items } = useReadingList();
+  const isAdded = items.some((item) => item.id === book.openLibraryId);
+
+  const isDev = process.env.NODE_ENV === "development";
+
+  const handleAddToList = (e: React.MouseEvent) => {
+    e.preventDefault(); 
+    e.stopPropagation();
+
+    if (isAdded) {
+      toast.info("Buku sudah ada di Reading List Anda.");
+      return;
+    }
+
+    addItem({
+      id: book.openLibraryId,
+      title: book.title,
+      coverUrl: book.coverUrl,
+    });
+
+    toast.success("Berhasil ditambahkan ke Reading List!");
+  };
+
   return (
-    <Card className="overflow-hidden group hover:shadow-lg transition-all duration-300 border-slate-200 h-full flex flex-col">
-      <div className="relative aspect-[2/3] w-full bg-slate-100">
-        <Image
-          src={book.coverUrl}
-          alt={book.title}
-          fill
-          unoptimized={true}
-          className="object-cover transition-transform group-hover:scale-105"
-          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-        />
-        {/* Overlay saat hover */}
-        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-          <Link href={`/book/${book.openLibraryId}`}>
-            <Button variant="secondary" size="sm">
-              Lihat Detail
-            </Button>
-          </Link>
-        </div>
+    <Link 
+      href={`/book/${book.openLibraryId}`} 
+      className="group flex flex-col h-full bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden"
+    >
+      <div className="relative aspect-[2/3] w-full bg-slate-100 overflow-hidden">
+        
+        <button
+          onClick={handleAddToList}
+          disabled={isAdded}
+          className={cn(
+            "absolute top-2 right-2 z-10 p-2 rounded-full shadow-md transition-all duration-300",
+            isAdded 
+              ? "bg-green-500 text-white opacity-100 cursor-default" 
+              : "bg-white/90 text-slate-700 hover:bg-blue-600 hover:text-white opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0"
+          )}
+          title={isAdded ? "Sudah ditambahkan" : "Tambah ke Reading List"}
+        >
+          {isAdded ? <Check className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+        </button>
+
+        {book.coverUrl ? (
+          <Image
+            src={book.coverUrl}
+            alt={book.title}
+            fill
+            className="object-cover transition-transform duration-500 group-hover:scale-105"
+            sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 20vw"
+            unoptimized={isDev} 
+          />
+        ) : (
+          <div className="w-full h-full flex flex-col items-center justify-center text-slate-400 p-4 text-center">
+            <BookOpen className="w-10 h-10 mb-2 opacity-50" />
+            <span className="text-xs">No Cover</span>
+          </div>
+        )}
       </div>
-      
-      <CardContent className="p-4 flex-1">
-        <h3 className="font-bold text-lg leading-tight line-clamp-2" title={book.title}>
+
+      <div className="flex flex-col flex-1 p-4">
+        <h3 className="font-semibold text-slate-900 line-clamp-2 mb-1 group-hover:text-blue-600 transition-colors">
           {book.title}
         </h3>
-        <p className="text-sm text-slate-500 mt-1 line-clamp-1">{book.author}</p>
-        <p className="text-xs text-slate-400 mt-2">
-          Terbit: {book.publishYear > 0 ? book.publishYear : "-"}
-        </p>
-      </CardContent>
-
-      <CardFooter className="p-4 pt-0">
-        {/* TOMBOL DIGANTI DI SINI */}
-        <div className="w-full">
-          <BookmarkButton 
-            book={book} 
-            initialState={isBookmarked}
-            variant="ghost"
-            size="sm"
-            // Kita atur style agar mirip tombol sebelumnya (lebar penuh)
-            className="w-full justify-start text-slate-500 hover:text-blue-600" 
-          />
+        <p className="text-sm text-slate-500 mb-2">{book.author}</p>
+        <div className="mt-auto pt-2 border-t border-slate-100 flex items-center justify-between">
+          <span className="text-xs font-medium text-slate-400 bg-slate-50 px-2 py-1 rounded">
+            {book.publishYear || "N/A"}
+          </span>
         </div>
-      </CardFooter>
-    </Card>
+      </div>
+    </Link>
   );
 }

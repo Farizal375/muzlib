@@ -5,9 +5,9 @@ import { ClerkProvider } from "@clerk/nextjs";
 import { Toaster } from "@/components/ui/sonner";
 import { Navbar } from "@/components/layout/navbar";
 import { Footer } from "@/components/layout/footer";
-// Import auth & prisma untuk cek role
 import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
+import { ReadingListDrawer } from "@/components/features/reading-list-drawer";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -47,7 +47,8 @@ export default async function RootLayout({
           suppressHydrationWarning={true}
         >
           {/* Kirim userRole ke Navbar */}
-          <Navbar userRole={userRole} /> 
+          <Navbar userRole={userRole} />
+          <ReadingListDrawer /> 
 
           <main className="flex-1 bg-slate-50">
             {children}
