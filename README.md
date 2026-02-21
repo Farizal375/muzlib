@@ -1,3 +1,12 @@
+Nama   : Farizal Muztahidin
+NPM    : 247006111044
+Kelas  : B
+
+Silahkan coba akses hasil devloyment pada tautan muzlib.vercel.app
+
+apli ini menggunakan supabase dan prisma ORM untuk database lokal dan untuk data dumy menggambil dari api open library.com
+
+
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
 ## Getting Started
